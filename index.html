@@ -366,26 +366,12 @@
             font-size: 13px;
             width: 160px;
         }
-        .warning-box {
-            background: rgba(255,0,0,0.2);
-            border: 2px solid #ff0000;
-            border-radius: 15px;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: center;
-            color: #ff6b6b;
-            font-weight: bold;
-        }
-        .warning-box button {
-            margin-top: 10px;
-        }
         @media print {
             body { background: white; color: black; }
             .panel { display: block !important; background: white; color: black; }
             .tab-btn, .btn { display: none; }
         }
     </style>
-<base target="_blank">
 </head>
 <body>
     <div class="container">
@@ -521,7 +507,140 @@
     <div class="toast" id="toast">Done!</div>
 
 <script>
+const PCE_FACTORS = {
+    'Car': 1.0, 'Bus': 2.5, 'Truck': 2.5, 'Pickup Van': 1.25,
+    'CNG': 1.0, 'Motorcycle': 0.3, 'NMV': 1.0
+};
+const VEHICLE_TYPES = ['Car', 'Bus', 'Truck', 'Pickup Van', 'CNG', 'Motorcycle', 'NMV'];
+const SESSIONS = ['Morning', 'Afternoon', 'Evening'];
+const SESSION_KEYS = ['morning', 'afternoon', 'evening'];
+const DIRECTIONS = ['IN', 'OUT'];
 
+let roadNames = ['New Market Rd', 'Elephant Rd', 'Science Lab Rd'];
+let trafficData = {};
+let currentRoadIndex = 0;
+let currentSession = 'morning';
+let currentDate = '26-06-22';
+let allDates = ['26-06-22', '29-06-22', '30-06-22'];
+
+function formatDate(dateStr) {
+    const parts = dateStr.split('-');
+    return parts[0] + '-' + parts[1] + '-' + parts[2].slice(-2);
+}
+
+function parseDate(dateStr) {
+    const parts = dateStr.split('-');
+    return '20' + parts[2] + '-' + parts[1] + '-' + parts[0];
+}
+
+function initData() {
+    roadNames.forEach(road => {
+        trafficData[road] = { 'IN': {}, 'OUT': {} };
+    });
+}
+
+const SAMPLE_DATA = {
+    'New Market Rd': {
+        'IN': {
+            '26-06-22': { 'Morning': {Car:162,Bus:38,Truck:2,'Pickup Van':13,CNG:44,Motorcycle:105,NMV:77}, 'Afternoon': {Car:143,Bus:32,Truck:2,'Pickup Van':21,CNG:51,Motorcycle:88,NMV:86}, 'Evening': {Car:114,Bus:36,Truck:3,'Pickup Van':15,CNG:46,Motorcycle:120,NMV:112} },
+            '29-06-22': { 'Morning': {Car:177,Bus:38,Truck:3,'Pickup Van':13,CNG:43,Motorcycle:93,NMV:79}, 'Afternoon': {Car:156,Bus:45,Truck:3,'Pickup Van':17,CNG:40,Motorcycle:97,NMV:123}, 'Evening': {Car:121,Bus:37,Truck:4,'Pickup Van':13,CNG:36,Motorcycle:100,NMV:145} },
+            '30-06-22': { 'Morning': {Car:165,Bus:44,Truck:2,'Pickup Van':16,CNG:38,Motorcycle:67,NMV:71}, 'Afternoon': {Car:141,Bus:28,Truck:4,'Pickup Van':15,CNG:37,Motorcycle:115,NMV:142}, 'Evening': {Car:135,Bus:25,Truck:2,'Pickup Van':14,CNG:35,Motorcycle:63,NMV:98} }
+        },
+        'OUT': {
+            '26-06-22': { 'Morning': {Car:386,Bus:100.2,Truck:5,'Pickup Van':56,CNG:103,Motorcycle:110,NMV:105}, 'Afternoon': {Car:450,Bus:102,Truck:10,'Pickup Van':39,CNG:122,Motorcycle:165,NMV:175}, 'Evening': {Car:425,Bus:104,Truck:12,'Pickup Van':50,CNG:167.4,Motorcycle:190,NMV:263} },
+            '29-06-22': { 'Morning': {Car:408,Bus:112.2,Truck:9,'Pickup Van':36.6,CNG:116,Motorcycle:115,NMV:120}, 'Afternoon': {Car:451,Bus:118,Truck:7,'Pickup Van':51,CNG:155.4,Motorcycle:162,NMV:218}, 'Evening': {Car:422,Bus:105,Truck:6,'Pickup Van':49.8,CNG:151,Motorcycle:205.8,NMV:235} },
+            '30-06-22': { 'Morning': {Car:408,Bus:108,Truck:8,'Pickup Van':39,CNG:121,Motorcycle:120,NMV:119}, 'Afternoon': {Car:351,Bus:104,Truck:4,'Pickup Van':44,CNG:136,Motorcycle:180,NMV:257}, 'Evening': {Car:422,Bus:109,Truck:8,'Pickup Van':49,CNG:195,Motorcycle:203,NMV:273} }
+        }
+    },
+    'Elephant Rd': {
+        'IN': {
+            '26-06-22': { 'Morning': {Car:188,Bus:40,Truck:3,'Pickup Van':57,CNG:30,Motorcycle:27,NMV:38}, 'Afternoon': {Car:140,Bus:34,Truck:6,'Pickup Van':27,CNG:45,Motorcycle:51,NMV:54}, 'Evening': {Car:211,Bus:52,Truck:6,'Pickup Van':59,CNG:69,Motorcycle:58,NMV:90} },
+            '29-06-22': { 'Morning': {Car:165,Bus:40,Truck:5,'Pickup Van':34,CNG:25,Motorcycle:30,NMV:39}, 'Afternoon': {Car:125,Bus:42,Truck:4,'Pickup Van':58,CNG:51,Motorcycle:92,NMV:72}, 'Evening': {Car:204,Bus:35,Truck:4,'Pickup Van':49,CNG:53,Motorcycle:82,NMV:86} },
+            '30-06-22': { 'Morning': {Car:200,Bus:46,Truck:6,'Pickup Van':44,CNG:43,Motorcycle:37,NMV:81}, 'Afternoon': {Car:190,Bus:42,Truck:2,'Pickup Van':65,CNG:39,Motorcycle:68,NMV:86}, 'Evening': {Car:269,Bus:33,Truck:5,'Pickup Van':36,CNG:72,Motorcycle:77,NMV:114} }
+        },
+        'OUT': {
+            '26-06-22': { 'Morning': {Car:370,Bus:106,Truck:5,'Pickup Van':21,CNG:105,Motorcycle:154,NMV:153}, 'Afternoon': {Car:422,Bus:105,Truck:6,'Pickup Van':39,CNG:160,Motorcycle:213,NMV:212}, 'Evening': {Car:386,Bus:97,Truck:11,'Pickup Van':31,CNG:159,Motorcycle:255,NMV:289} },
+            '29-06-22': { 'Morning': {Car:354,Bus:118,Truck:9,'Pickup Van':23,CNG:129,Motorcycle:167,NMV:187}, 'Afternoon': {Car:382,Bus:156,Truck:8,'Pickup Van':43,CNG:155,Motorcycle:217,NMV:284}, 'Evening': {Car:380,Bus:116,Truck:7,'Pickup Van':22,CNG:144,Motorcycle:240,NMV:232} },
+            '30-06-22': { 'Morning': {Car:393,Bus:116,Truck:6,'Pickup Van':21,CNG:145,Motorcycle:105,NMV:145}, 'Afternoon': {Car:396,Bus:95,Truck:8,'Pickup Van':36,CNG:144,Motorcycle:241,NMV:286}, 'Evening': {Car:374,Bus:107,Truck:6,'Pickup Van':31,CNG:179,Motorcycle:236,NMV:278} }
+        }
+    },
+    'Science Lab Rd': {
+        'IN': {
+            '26-06-22': { 'Morning': {Car:236,Bus:69,Truck:3,'Pickup Van':12,CNG:62,Motorcycle:49,NMV:76}, 'Afternoon': {Car:338,Bus:75,Truck:5,'Pickup Van':18,CNG:109,Motorcycle:125,NMV:134}, 'Evening': {Car:257,Bus:62,Truck:8,'Pickup Van':19,CNG:113,Motorcycle:135,NMV:192} },
+            '29-06-22': { 'Morning': {Car:277,Bus:80,Truck:6,'Pickup Van':10,CNG:86,Motorcycle:75,NMV:114}, 'Afternoon': {Car:252,Bus:86,Truck:5,'Pickup Van':26,CNG:116,Motorcycle:120,NMV:162}, 'Evening': {Car:259,Bus:77,Truck:3,'Pickup Van':11,CNG:109,Motorcycle:141,NMV:168} },
+            '30-06-22': { 'Morning': {Car:239,Bus:72,Truck:4,'Pickup Van':42,CNG:108,Motorcycle:112,NMV:83}, 'Afternoon': {Car:255,Bus:71,Truck:3,'Pickup Van':20,CNG:107,Motorcycle:127,NMV:190}, 'Evening': {Car:238,Bus:83,Truck:5,'Pickup Van':17,CNG:152,Motorcycle:173,NMV:191} }
+        },
+        'OUT': {
+            '26-06-22': { 'Morning': {Car:313,Bus:69,Truck:3,'Pickup Van':55,CNG:65,Motorcycle:125,NMV:107}, 'Afternoon': {Car:246,Bus:55,Truck:6,'Pickup Van':45,CNG:86,Motorcycle:128,NMV:130}, 'Evening': {Car:263,Bus:73,Truck:7,'Pickup Van':65,CNG:98,Motorcycle:150,NMV:183} },
+            '29-06-22': { 'Morning': {Car:310,Bus:70,Truck:6,'Pickup Van':40,CNG:85,Motorcycle:138,NMV:132}, 'Afternoon': {Car:231,Bus:75,Truck:6,'Pickup Van':45,CNG:80,Motorcycle:106,NMV:185}, 'Evening': {Car:285,Bus:65,Truck:8,'Pickup Van':52,CNG:78,Motorcycle:158,NMV:124} },
+            '30-06-22': { 'Morning': {Car:315,Bus:80,Truck:6,'Pickup Van':50,CNG:72,Motorcycle:96,NMV:102}, 'Afternoon': {Car:293,Bus:57,Truck:7,'Pickup Van':48,CNG:65,Motorcycle:170,NMV:210}, 'Evening': {Car:290,Bus:55,Truck:5,'Pickup Van':38,CNG:82,Motorcycle:143,NMV:175} }
+        }
+    }
+};
+
+function toggleRoadEdit() {
+    const editor = document.getElementById('road-name-editor');
+    const btn = document.getElementById('edit-roads-btn');
+    if (editor.style.display === 'none') {
+        editor.style.display = 'flex';
+        btn.textContent = 'Done Editing';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-success');
+    } else {
+        editor.style.display = 'none';
+        btn.textContent = 'Edit Road Names';
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-primary');
+    }
+}
+
+function editRoadName(index) {
+    toggleRoadEdit();
+    document.getElementById('road-name-' + (index+1)).focus();
+}
+
+function updateRoadName(index) {
+    const newName = document.getElementById('road-name-' + (index+1)).value.trim();
+    if (!newName) return;
+    const oldName = roadNames[index];
+    roadNames[index] = newName;
+    if (trafficData[oldName]) {
+        trafficData[newName] = trafficData[oldName];
+        delete trafficData[oldName];
+    }
+    document.getElementById('road-display-' + index).textContent = newName;
+    showToast('Road name updated to: ' + newName);
+}
+
+function addDate() {
+    const picker = document.getElementById('date-picker');
+    const dateVal = picker.value;
+    if (!dateVal) { showToast('Please select a date first'); return; }
+    const parts = dateVal.split('-');
+    const formatted = parts[2] + '-' + parts[1] + '-' + parts[0].slice(-2);
+    if (allDates.includes(formatted)) { showToast('Date already exists'); return; }
+    allDates.push(formatted);
+    allDates.sort();
+    roadNames.forEach(road => {
+        if (!trafficData[road]) trafficData[road] = { 'IN': {}, 'OUT': {} };
+        if (!trafficData[road]['IN'][formatted]) {
+            trafficData[road]['IN'][formatted] = {};
+            trafficData[road]['OUT'][formatted] = {};
+        }
+    });
+    updateDateSelect();
+    document.getElementById('date-select').value = dateVal;
+    changeDate();
+    showToast('Date ' + formatted + ' added');
+}
+
+function deleteCurrentDate() {
+    if (allDates.length <= 1) { showToast('Cannot delete last date'); return; }
+    const idx = allDates.indexOf(currentDate);
+    if (idx > -1) {
+        roadNames.forEach(road => {
+            if (trafficData[road]) {
+                if (trafficData[road]['IN']) delete trafficData[road]['IN'][currentDate];
                 if (trafficData[road]['OUT']) delete trafficData[road]['OUT'][currentDate];
             }
         });
@@ -610,7 +729,6 @@ function saveData() {
     });
     trafficData[road]['IN'][currentDate][session] = inData;
     trafficData[road]['OUT'][currentDate][session] = outData;
-    dataLoaded = true;
     showToast('Saved: ' + road + ' | ' + currentDate + ' | ' + session);
 }
 
@@ -627,15 +745,13 @@ function loadSampleData() {
     updateDateSelect();
     document.getElementById('date-select').value = '2022-06-26';
     currentDate = '26-06-22';
-    dataLoaded = true;
     loadInputData();
-    showToast('Sample data loaded! Click on PCU, Cycle Length, LOS, or Charts tabs to see results.');
+    showToast('Sample data loaded from your Excel file!');
 }
 
 function clearAllData() {
     trafficData = {};
     roadNames.forEach(road => { trafficData[road] = { 'IN': {}, 'OUT': {} }; });
-    dataLoaded = false;
     VEHICLE_TYPES.forEach(vt => {
         const key = vt === 'Pickup Van' ? 'pickup' : vt.toLowerCase().replace(' ', '');
         document.getElementById('in-' + key).value = 0;
@@ -675,7 +791,6 @@ function loadFromFile(event) {
                 currentDate = allDates[0];
                 document.getElementById('date-select').value = parseDate(currentDate);
             }
-            dataLoaded = true;
             loadInputData();
             showToast('Data loaded from file');
         } catch(err) { alert('Invalid JSON file'); }
@@ -710,7 +825,7 @@ function getMaxPCUForSession(session) {
             if (!trafficData[road][dir]) return;
             const dates = Object.keys(trafficData[road][dir]);
             dates.forEach(date => {
-                if (!trafficData[road][dir][date] || !trafficData[road][dir][date][session]) return;
+                if (!trafficData[road][dir][date][session]) return;
                 const pcu = calculatePCU(trafficData[road][dir][date][session]);
                 const key = road + ' ' + dir;
                 if (!maxPCU[key] || pcu > maxPCU[key]) maxPCU[key] = pcu;
@@ -777,7 +892,6 @@ function calculateLOS(session, cycleData) {
 }
 
 function renderPCUResults() {
-    if (showDataWarning('pcu-results')) return;
     let html = '<div class="summary-cards">';
     SESSIONS.forEach(session => {
         let totalPCU = 0;
@@ -821,7 +935,6 @@ function renderPCUResults() {
 }
 
 function renderCycleLength() {
-    if (showDataWarning('cycle-results')) return;
     const phasePercents = { 'Morning': [32, 42, 27], 'Afternoon': [36, 39, 25], 'Evening': [38, 36, 26] };
     let html = '<div class="summary-cards">';
     SESSIONS.forEach(session => {
@@ -868,7 +981,6 @@ function renderCycleLength() {
 }
 
 function renderLOS() {
-    if (showDataWarning('los-results')) return;
     const phasePercents = { 'Morning': [32, 42, 27], 'Afternoon': [36, 39, 25], 'Evening': [38, 36, 26] };
     let html = '';
     SESSIONS.forEach(session => {
@@ -896,7 +1008,6 @@ function renderLOS() {
 }
 
 function renderCharts() {
-    if (showDataWarning('charts-container')) return;
     let html = '';
     html += '<div class="chart-container"><h3 style="color:#ffd700;margin-bottom:15px;">PCU by Road & Session</h3><div class="chart-wrapper"><canvas id="chart-pcu"></canvas></div></div>';
     html += '<div class="chart-container"><h3 style="color:#ffd700;margin-bottom:15px;">Vehicle Composition</h3><div class="chart-wrapper"><canvas id="chart-composition"></canvas></div></div>';
